@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import '../api/foreign_stock_api.dart' as foreign_api;
 import '../api/stock_detail_api.dart' as detail_api;
 import '../api/stock_quote_api.dart';
 import '../db/favorites_db.dart' as db;
 import '../models/stock_detail.dart';
 import '../models/stock_summary.dart';
 import '../theme.dart';
+
+const _kNotAvailableForForeign = '해외 종목 미표시';
 
 class StockDetailScreen extends StatefulWidget {
   final StockSummary stock;
@@ -38,11 +41,27 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
       _loading = true;
     });
 
+    final isFavoriteFuture = db.isFavorite(widget.stock.code);
+
+    if (widget.stock.isForeign) {
+      final results = await Future.wait([
+        foreign_api.fetchForeignStockDetail(widget.stock),
+        isFavoriteFuture,
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _detail = results[0] as StockDetail;
+        _isFavorite = results[1] as bool;
+        _loading = false;
+      });
+      return;
+    }
+
     // 시세, 상세 HTML 파싱, DB 조회는 서로 독립적이라 Future.wait로 동시에 보냅니다.
     final results = await Future.wait([
       fetchStockQuote(widget.stock.code),
       detail_api.fetchStockDetail(widget.stock),
-      db.isFavorite(widget.stock.code),
+      isFavoriteFuture,
     ]);
 
     if (!mounted) return;
@@ -71,7 +90,7 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
     });
 
     if (_isFavorite) {
-      await db.addFavorite(widget.stock.code, widget.stock.name, widget.stock.market);
+      await db.addFavorite(widget.stock);
     } else {
       await db.removeFavorite(widget.stock.code);
     }
@@ -123,11 +142,20 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
                     style: const TextStyle(color: kGrayLabel, fontSize: 13),
                   ),
                   const SizedBox(height: 16),
-                  _SectionCard(title: '기본정보', child: _BasicInfoView(info: _detail?.basicInfo)),
-                  _SectionCard(title: '투자지표', child: _IndicatorsView(info: _detail?.indicators)),
+                  _SectionCard(
+                    title: '기본정보',
+                    child: _BasicInfoView(info: _detail?.basicInfo, isForeign: widget.stock.isForeign),
+                  ),
+                  _SectionCard(
+                    title: '투자지표',
+                    child: _IndicatorsView(info: _detail?.indicators, isForeign: widget.stock.isForeign),
+                  ),
                   _SectionCard(title: '기업개요', child: _OverviewView(lines: _detail?.companyOverview ?? const [])),
                   _SectionCard(title: '재무비율', child: _FinancialsView(years: _detail?.financials ?? const [])),
-                  _SectionCard(title: '컨센서스', child: _ConsensusView(info: _detail?.consensus)),
+                  _SectionCard(
+                    title: '컨센서스',
+                    child: _ConsensusView(info: _detail?.consensus, isForeign: widget.stock.isForeign),
+                  ),
                 ],
               ),
       ),
@@ -201,8 +229,9 @@ class _KeyValueRow extends StatelessWidget {
 
 class _BasicInfoView extends StatelessWidget {
   final StockBasicInfo? info;
+  final bool isForeign;
 
-  const _BasicInfoView({required this.info});
+  const _BasicInfoView({required this.info, this.isForeign = false});
 
   @override
   Widget build(BuildContext context) {
@@ -217,8 +246,8 @@ class _BasicInfoView extends StatelessWidget {
         _KeyValueRow(label: '고가', value: info?.highPrice),
         _KeyValueRow(label: '저가', value: info?.lowPrice),
         _KeyValueRow(label: '거래량', value: info?.volume),
-        _KeyValueRow(label: '거래대금(백만)', value: info?.tradingValue),
-        _KeyValueRow(label: '시가총액(억)', value: info?.marketCap),
+        _KeyValueRow(label: isForeign ? '거래대금' : '거래대금(백만)', value: info?.tradingValue),
+        _KeyValueRow(label: isForeign ? '시가총액' : '시가총액(억)', value: info?.marketCap),
         _KeyValueRow(label: '기준시각', value: info?.updatedAt),
       ],
     );
@@ -227,8 +256,9 @@ class _BasicInfoView extends StatelessWidget {
 
 class _IndicatorsView extends StatelessWidget {
   final StockIndicators? info;
+  final bool isForeign;
 
-  const _IndicatorsView({required this.info});
+  const _IndicatorsView({required this.info, this.isForeign = false});
 
   @override
   Widget build(BuildContext context) {
@@ -237,15 +267,15 @@ class _IndicatorsView extends StatelessWidget {
       children: [
         _KeyValueRow(label: 'PER', value: info?.per),
         _KeyValueRow(label: 'EPS', value: info?.eps),
-        _KeyValueRow(label: '추정 PER', value: info?.estimatedPer),
-        _KeyValueRow(label: '추정 EPS', value: info?.estimatedEps),
+        _KeyValueRow(label: '추정 PER', value: isForeign ? _kNotAvailableForForeign : info?.estimatedPer),
+        _KeyValueRow(label: '추정 EPS', value: isForeign ? _kNotAvailableForForeign : info?.estimatedEps),
         _KeyValueRow(label: 'PBR', value: info?.pbr),
         _KeyValueRow(label: 'BPS', value: info?.bps),
         _KeyValueRow(label: '배당수익률(%)', value: info?.dividendYield),
         _KeyValueRow(label: '52주 최고', value: info?.week52High),
         _KeyValueRow(label: '52주 최저', value: info?.week52Low),
-        _KeyValueRow(label: '외국인지분율(%)', value: info?.foreignRatio),
-        _KeyValueRow(label: '시가총액(억)', value: info?.marketCap),
+        if (!isForeign) _KeyValueRow(label: '외국인지분율(%)', value: info?.foreignRatio),
+        _KeyValueRow(label: isForeign ? '시가총액' : '시가총액(억)', value: info?.marketCap),
       ],
     );
   }
@@ -323,19 +353,20 @@ class _FinancialsView extends StatelessWidget {
 
 class _ConsensusView extends StatelessWidget {
   final ConsensusInfo? info;
+  final bool isForeign;
 
-  const _ConsensusView({required this.info});
+  const _ConsensusView({required this.info, this.isForeign = false});
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _KeyValueRow(label: '투자의견', value: info?.opinion),
+        _KeyValueRow(label: isForeign ? '추천점수(1~5)' : '투자의견', value: info?.opinion),
         _KeyValueRow(label: '목표주가', value: info?.targetPrice),
-        _KeyValueRow(label: 'EPS', value: info?.eps),
-        _KeyValueRow(label: 'PER', value: info?.per),
-        _KeyValueRow(label: '추정기관수', value: info?.analystCount),
+        if (!isForeign) _KeyValueRow(label: 'EPS', value: info?.eps),
+        if (!isForeign) _KeyValueRow(label: 'PER', value: info?.per),
+        _KeyValueRow(label: '추정기관수', value: isForeign ? _kNotAvailableForForeign : info?.analystCount),
       ],
     );
   }
