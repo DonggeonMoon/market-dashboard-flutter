@@ -1,0 +1,6 @@
+# Flutter가 플랫폼 빌드 시 재생성하는 플러그인 등록 파일들.
+# 생성 도구가 OS에 따라 줄바꿈을 다르게 써서 core.autocrlf와 충돌해
+# 매번 changes로 뜨는 것을 막기 위해 줄바꿈을 LF로 고정한다.
+**/generated_plugin_registrant.* text eol=lf
+**/GeneratedPluginRegistrant.* text eol=lf
+**/generated_plugins.cmake text eol=lf
