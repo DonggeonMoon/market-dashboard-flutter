@@ -4,9 +4,14 @@ class StockSummary {
   final String name;
   final String market;
 
+  final String reutersCode;
+  final bool isForeign;
+
   const StockSummary({
     required this.code,
     required this.name,
     required this.market,
-  });
+    String? reutersCode,
+    this.isForeign = false,
+  }) : reutersCode = reutersCode ?? code;
 }

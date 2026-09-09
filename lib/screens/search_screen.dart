@@ -97,7 +97,7 @@ class _SearchScreenState extends State<SearchScreen> {
     });
 
     if (willBeFavorite) {
-      await db.addFavorite(stock.code, stock.name, stock.market);
+      await db.addFavorite(stock);
     } else {
       await db.removeFavorite(stock.code);
     }

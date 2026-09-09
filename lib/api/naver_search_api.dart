@@ -31,6 +31,8 @@ Future<List<StockSummary>> searchStocks(String query) async {
               code: item['code'] as String,
               name: item['name'] as String,
               market: item['typeName'] as String? ?? '',
+              reutersCode: item['reutersCode'] as String?,
+              isForeign: item['nationCode'] != 'KOR',
             ))
         .toList();
   } catch (e) {
