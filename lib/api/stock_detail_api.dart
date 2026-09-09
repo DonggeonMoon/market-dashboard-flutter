@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/stock_detail.dart';
 import '../models/stock_summary.dart';
@@ -63,15 +64,44 @@ String? _byLabelCell(String html, String label) {
   return _clean(pattern.firstMatch(html)?.group(1));
 }
 
+/// ETN/ETF 페이지는 시가총액·외국인지분율 등을 서버가 직접 채우지 않고
+/// `var status_data = {...}` 값을 자바스크립트 템플릿(`${MKT_VAL}` 등)으로 치환한다.
+/// 우리는 JS를 실행하지 않으므로 이런 페이지에서는 <td> 안에 미치환 템플릿 문자열이
+/// 그대로 남아있고, status_data에서 실제 값을 꺼내야 한다.
+Map<String, dynamic> _statusData(String html) {
+  final m = RegExp(r'var\s+status_data\s*=\s*(\{[\s\S]*?\});').firstMatch(html);
+  if (m == null) return {};
+  try {
+    return jsonDecode(m.group(1)!) as Map<String, dynamic>;
+  } catch (_) {
+    return {};
+  }
+}
+
+/// [raw]가 미치환 템플릿(`${...}`)이면 status_data에서 [key] 값을 꺼내 [suffix]를 붙여 돌려주고,
+/// 그마저 없으면 null을 돌려준다.
+String? _resolveTemplate(String? raw, Map<String, dynamic> statusData, String key, {String suffix = ''}) {
+  if (raw == null) return null;
+  if (!raw.contains(r'${')) return raw;
+  final value = statusData[key] as String?;
+  if (value == null || value.trim().isEmpty) return null;
+  return '$value$suffix';
+}
+
 // ── 투자지표 ──────────────────────────────
 
 StockIndicators _parseIndicators(String html, ConsensusInfo? consensus) {
   try {
-    final per = _byId(html, '_per') ?? _byDtLabel(html, 'PER');
+    final statusData = _statusData(html);
+
+    var per = _byId(html, '_per') ?? _byDtLabel(html, 'PER');
+    if (per != null && per.trim().toUpperCase() == 'N/A') per = '없음';
+
     final eps = _byId(html, '_eps') ?? _byDtLabel(html, 'EPS');
     final pbr = _byId(html, '_pbr') ?? _byDtLabel(html, 'PBR');
     final dvr = _byId(html, '_dvr') ?? _byDtLabel(html, '현금배당수익률');
-    final marketSum = _byId(html, '_market_sum') ?? _byLabelCell(html, '시가총액');
+    final marketSumRaw = _byId(html, '_market_sum') ?? _byLabelCell(html, '시가총액');
+    final marketSum = _resolveTemplate(marketSumRaw, statusData, 'MKT_VAL', suffix: '억원');
 
     // 추정 PER/EPS 전용 id가 없으면 컨센서스 표의 PER/EPS(증권사 추정치)를 재사용합니다.
     final estimatedPer = _byId(html, '_cns_per') ?? consensus?.per;
@@ -88,7 +118,8 @@ StockIndicators _parseIndicators(String html, ConsensusInfo? consensus) {
       week52Low = parts.length > 1 ? parts[1].replaceAll('원', '').trim() : null;
     }
 
-    final foreignRatio = _byLabelCell(html, '외국인지분율')?.replaceAll('%', '').trim();
+    final foreignRatioRaw = _byLabelCell(html, '외국인지분율')?.replaceAll('%', '').trim();
+    final foreignRatio = _resolveTemplate(foreignRatioRaw, statusData, 'FRG_RT');
 
     return StockIndicators(
       per: per,
