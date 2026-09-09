@@ -131,32 +131,36 @@ class _StockDetailScreenState extends State<StockDetailScreen> {
             ),
           ],
         ),
-        body: _loading
+        body: _detail == null && _loading
             ? const Center(child: CircularProgressIndicator(color: kAccentBlue))
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(
-                    kScreenPadding, 12, kScreenPadding, 24),
-                children: [
-                  Text(
-                    '${widget.stock.code} · ${widget.stock.market}',
-                    style: const TextStyle(color: kGrayLabel, fontSize: 13),
-                  ),
-                  const SizedBox(height: 16),
-                  _SectionCard(
-                    title: '기본정보',
-                    child: _BasicInfoView(info: _detail?.basicInfo, isForeign: widget.stock.isForeign),
-                  ),
-                  _SectionCard(
-                    title: '투자지표',
-                    child: _IndicatorsView(info: _detail?.indicators, isForeign: widget.stock.isForeign),
-                  ),
-                  _SectionCard(title: '기업개요', child: _OverviewView(lines: _detail?.companyOverview ?? const [])),
-                  _SectionCard(title: '재무비율', child: _FinancialsView(years: _detail?.financials ?? const [])),
-                  _SectionCard(
-                    title: '컨센서스',
-                    child: _ConsensusView(info: _detail?.consensus, isForeign: widget.stock.isForeign),
-                  ),
-                ],
+            : RefreshIndicator(
+                onRefresh: _load,
+                color: kAccentBlue,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                      kScreenPadding, 12, kScreenPadding, 24),
+                  children: [
+                    Text(
+                      '${widget.stock.code} · ${widget.stock.market}',
+                      style: const TextStyle(color: kGrayLabel, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    _SectionCard(
+                      title: '기본정보',
+                      child: _BasicInfoView(info: _detail?.basicInfo, isForeign: widget.stock.isForeign),
+                    ),
+                    _SectionCard(
+                      title: '투자지표',
+                      child: _IndicatorsView(info: _detail?.indicators, isForeign: widget.stock.isForeign),
+                    ),
+                    _SectionCard(title: '기업개요', child: _OverviewView(lines: _detail?.companyOverview ?? const [])),
+                    _SectionCard(title: '재무비율', child: _FinancialsView(years: _detail?.financials ?? const [])),
+                    _SectionCard(
+                      title: '컨센서스',
+                      child: _ConsensusView(info: _detail?.consensus, isForeign: widget.stock.isForeign),
+                    ),
+                  ],
+                ),
               ),
       ),
     );
