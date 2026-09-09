@@ -87,7 +87,9 @@ StockBasicInfo toBasicInfo(StockRealtimeQuote? q) {
   if (q == null) return const StockBasicInfo();
   final isDown = q.direction == 'FALLING';
   final isUp = q.direction == 'RISING';
-  final sign = isDown ? '-' : (isUp ? '+' : '');
+  final sign = q.direction != null
+      ? (isDown ? '-' : (isUp ? '+' : ''))
+      : ((q.changeRatio ?? '').startsWith('-') ? '-' : '');
   final ratio = (q.changeRatio ?? '').replaceAll('-', '');
   return StockBasicInfo(
     market: q.market,

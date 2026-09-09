@@ -82,10 +82,14 @@ StockBasicInfo _parseBasicInfo(Map<String, dynamic>? basic) {
     final currencyCode = (basic['currencyType'] as Map<String, dynamic>?)?['code'] as String?;
     final closePrice = basic['closePrice'] as String?;
 
-    final isDown = compare?['name'] == 'FALLING';
-    final isUp = compare?['name'] == 'RISING';
-    final sign = isDown ? '-' : (isUp ? '+' : '');
-    final ratio = (basic['fluctuationsRatio'] as String?)?.replaceAll('-', '');
+    final directionName = compare?['name'] as String?;
+    final isDown = directionName == 'FALLING';
+    final isUp = directionName == 'RISING';
+    final rawRatio = basic['fluctuationsRatio'] as String?;
+    final sign = directionName != null
+        ? (isDown ? '-' : (isUp ? '+' : ''))
+        : (rawRatio?.startsWith('-') == true ? '-' : '');
+    final ratio = rawRatio?.replaceAll('-', '');
 
     return StockBasicInfo(
       market: exchangeType?['nameKor'] as String?,

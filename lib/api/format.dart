@@ -5,7 +5,9 @@ String? toValueText(NaverRealtimeItem? item) => item?.closePrice;
 String? toChangeText(NaverRealtimeItem? item) {
   if (item == null) return null;
   final isDown = item.fluctuationsTypeName == 'FALLING';
-  final sign = isDown ? '-' : '+';
+  final sign = item.fluctuationsTypeName != null
+      ? (isDown ? '-' : '+')
+      : (item.fluctuationsRatio.startsWith('-') ? '-' : '+');
   final cleanRatio = item.fluctuationsRatio.replaceAll('-', '');
   return '$sign$cleanRatio%';
 }
